@@ -7,7 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 
 @FeignClient(name = "kakaoPayApi"
-           , url = "https://open-api.kakaopay.com/online/v1/payment"
+           , url = "${constants.kakao-pay.base-url}"
            , configuration = { FeignClientKakaoPayConfiguration.class })
 public interface KakaoPayFeignClient {
 
