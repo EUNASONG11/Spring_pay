@@ -29,6 +29,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfiguration {
     @Bean
+    public GroupedOpenApi groupAllApi() {
+        return GroupedOpenApi.builder()
+                .group("All")
+                .packagesToScan("com.green.greengram")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi groupGreengramApi() {
         return GroupedOpenApi.builder()
                 .group("Greengram")
