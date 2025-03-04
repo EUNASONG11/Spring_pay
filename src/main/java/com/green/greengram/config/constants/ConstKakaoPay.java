@@ -11,6 +11,7 @@ public class ConstKakaoPay {
     private final String authorizationName;
     private final String secretKey;
     private final String cid;
+    private final String approvalUrl;
     private final String completedUrl;
     private final String failUrl;
     private final String cancelUrl;

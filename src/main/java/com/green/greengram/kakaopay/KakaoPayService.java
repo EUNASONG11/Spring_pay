@@ -34,37 +34,43 @@ public class KakaoPayService {
     public KakaoPayReadyRes postReady(KakaoPayReadyReq req) {
         if(req.getProductList().size() == 0) { throw new CustomException(PayErrorCode.NOT_EXISTED_PRODUCT_INFO);  }
         List<Long> productIds = req.getProductList().stream()
-                                                    .mapToLong(item -> item.getProductId())
-                                                    .boxed()
-                                                    .toList(); //구매하려는 상품 PK 값만 추려내기
-        List<Product> productList = productRepository.findByProductIdIn(productIds); //구매하고자 하는 상품 list가 DB로부터 넘어옴
+                .mapToLong(item -> item.getProductId())
+                .boxed()
+                .toList(); //구매하려는 상품PK값만 추리고 있음
+        List<Product> productList = productRepository.findByProductIdIn(productIds); //구매하고자 하는 상품 리스트가 DB로부터 넘어옴
         if(req.getProductList().size() != productList.size()) { throw new CustomException(PayErrorCode.NO_EXISTED_PRODUCT_INFO); }
 
         //Product 목록을 Map으로 변환하여 빠르게 검색 가능하게 만듦 Function.identity()는 객체의 멤버필드가 아닌 객체 자신을 말한다.
         Map<Long, OrderProductDto> orderProductMap = req.getProductList().stream().collect(Collectors.toMap(OrderProductDto::getProductId, Function.identity()));
 
-        // 총 결제 금액
-        // reduce의 첫 번째 인자 : 0은 초기값
-        // reduce의 두 번째 인자 : BiFunction(파라미터가 2개 라는 뜻) Implements 한 객체 주소 값, 첫 번째 파라미터는 이전 리턴 값(최초만 초기값이 들어옴)/두 번째 파라미터는 stream 자식이 순차적으로 넘어옴
+        //총 결제금액
+        //첫번째인자: 0은 초기값
+        //두번째인자: BiFunction Implements 객체 주소값, 첫번째 파라미터는 이전 리턴값(최초만 초기값이 들어옴), 두번째 파라미터 스트림 자식 순차적으로 넘어옴
         int totalAmount = productList.stream().reduce(0
-                                                   , (prev, item) ->  prev + (item.getProductPrice() * orderProductMap.get(item.getProductId()).getQuantity())
-                                                   , Integer::sum);
+                , (prev, item) ->  prev + (item.getProductPrice() * orderProductMap.get(item.getProductId()).getQuantity())
+                , Integer::sum);
 
-        //DB insert 작업
+        //DB insert작업 준비
         User signedUser = User.builder()
                 .userId(authenticationFacade.getSignedUserId())
                 .build();
 
+        //OrderMaster entity 객체화 (영속성이 없음) --- (A)라고 호칭
+        //영속성이 없는 상태에서 save 하면 insert, 영속성이 있는 상태에서 save 하면 update
         OrderMaster orderMaster = OrderMaster.builder()
                 .user(signedUser)
                 .totalAmount(totalAmount)
                 .orderStatusCode(OrderStatusCode.READY)
                 .build();
 
+        log.info("orderMaster - orderId : {}", orderMaster.getOrderId()); // null로 예상
         for(Product item : productList) {
+            //OrderProduct entity는 복합키로 구성, OrderProductIds 객체화 --- (B)라고 호칭
             OrderProductIds ids = OrderProductIds.builder()
-                    .orderId(item.getProductId())
+                    .productId(item.getProductId()) //orderId 값을 넣을 수 없다. 왜냐하면 아직 (A)가 insert 전이기 때문
                     .build();
+
+            //OrderProduct entity 객체화 (영속성이 없음) --- (C)라고 호칭
             OrderProduct orderProduct = OrderProduct.builder()
                     .ids(ids)
                     .product(item)
@@ -72,22 +78,19 @@ public class KakaoPayService {
                     .unitPrice(item.getProductPrice())
                     .build();
 
-            orderMaster.addOrderProduct(orderProduct);
+            orderMaster.addOrderProduct(orderProduct); //양방향 연결/ 즉, (A)랑 (C)랑 연결, A도 C를 알아야 하고 C도 A를 알아야 한다
         }
 
         orderMasterRepository.save(orderMaster);
 
-        // 결제 준비 단계
+        //결제 준비 단계
         /*
-
-            상품 1개 구매
-            AAA 상품만 구매한다고 했을 때
+            AAA 상품만 산다고 했을 때 (상품 1개)
             itemName = "AAA";
 
-            상품 여러 개 구매
-            AAA, BBB, CCC 상품을 구매한다고 했을 때
+            AAA, BBB, CCC
             itemName = "AAA";
-            -> itemName = "AAA 외 2개";
+            itemName = "AAA 외 2개"
 
          */
         String itemName = productList.get(0).getProductName();
@@ -97,21 +100,20 @@ public class KakaoPayService {
 
         KakaoPayReadyFeignReq feignReq = KakaoPayReadyFeignReq.builder()
                 .cid(constKakaoPay.getCid())
-                .partnerOrderId(orderMaster.getOrderId().toString()) //OrderMaster에 insert 된 orderId 값 / 거래 PK값이 좋음
+                .partnerOrderId(orderMaster.getOrderId().toString()) //OrderMaster에 insert된 orderId값
                 .partnerUserId(String.valueOf(authenticationFacade.getSignedUserId())) //결제 유저 ID
                 .itemName(itemName)
                 .quantity(productList.size())
                 .totalAmount(totalAmount)
                 .taxFreeAmount(0)
-                .approvalUrl(constKakaoPay.getCompletedUrl())
+                .approvalUrl(constKakaoPay.getApprovalUrl()) //QR 처리를 하면 redirect 되는 주소값
                 .failUrl(constKakaoPay.getFailUrl())
                 .cancelUrl(constKakaoPay.getCancelUrl())
                 .build();
+        KakaoPayReadyRes res = kakaoPayFeignClient.postReady(feignReq); //결제 준비단계 요청을 보내고 응답으로 tid를 얻을 수 있다.
 
 
-        KakaoPayReadyRes res = kakaoPayFeignClient.postReady(feignReq); //결제 준비 단계 요청을 보내고 응답으로 tid를 얻을 수 있다.
-
-        //세션에 결제 정보 저장 (결제 승인 때 결제 준비 단계에서 보낸 tid, partnerOrderId, partnerUserId 가 같아야 한다. 그래서 session에 저장함)
+        //세션에 결제 정보 저장 ( 결제 승인 때 결제 준비 단계에서 보낸 tid, partnerOrderId, partnerUserId가 같아야 한다. 그래서 세션에 저장함 )
         KakaoPaySessionDto dto = KakaoPaySessionDto.builder()
                 .tid(res.getTid())
                 .partnerOrderId(feignReq.getPartnerOrderId())
@@ -123,7 +125,7 @@ public class KakaoPayService {
         return res;
     }
 
-    public String getApprove(KakaoPayApproveReq req) {
+    public KakaoPayApproveRes getApprove(KakaoPayApproveReq req) {
         //카카오페이 준비과정에서 세션에 저장한 tid, partnerOrderId, partnerUserId 가져오기
         KakaoPaySessionDto dto = (KakaoPaySessionDto) SessionUtils.getAttribute(constKakaoPay.getKakaoPayInfoSessionName());
         log.info("결제승인 요청을 인증하는 토큰: {}", req.getPgToken());
@@ -144,7 +146,8 @@ public class KakaoPayService {
         OrderMaster orderMaster = orderMasterRepository.findById(Long.parseLong(dto.getPartnerOrderId())).orElse(null);
         if(orderMaster != null) {
             orderMaster.setOrderStatusCode(OrderStatusCode.COMPLETED);
+            orderMasterRepository.save(orderMaster);
         }
-        return constKakaoPay.getCompletedUrl();
+        return res;
     }
 }
