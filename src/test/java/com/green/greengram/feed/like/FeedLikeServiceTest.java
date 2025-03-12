@@ -5,6 +5,8 @@ import com.green.greengram.entity.Feed;
 import com.green.greengram.entity.FeedLike;
 import com.green.greengram.entity.FeedLikeIds;
 import com.green.greengram.entity.User;
+import com.green.greengram.feed.like.model.FeedLikeReq;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

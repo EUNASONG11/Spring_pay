@@ -20,6 +20,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode
 public class User extends UpdatedAt {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) //auto_increment
@@ -28,7 +29,7 @@ public class User extends UpdatedAt {
     @Column(nullable = false)
     private SignInProviderType providerType;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 50)
     private String uid;
 
     @Column(nullable = false, length = 100)

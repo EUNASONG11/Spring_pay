@@ -63,12 +63,21 @@ class FeedLikeRepositoryTest {
     @Test
     void insFeedLike() {
         //when
-        List<FeedLike> actualFeedLikeListBefore = feedLikeRepository.findAll(); //insert전 튜플 수
-        FeedLike actualFeedLikeBefore = feedLikeRepository.findById(FeedLikeIds.builder().userId(userId_2).feedId(feedId_2).build()).orElse(null); //insert전 존재하지 않는 레코드 읽기
+        List<FeedLike> actualFeedLikeListBefore = feedLikeRepository.findAll(); //insert 전 튜플 수 (expectedRows : 1)
+        FeedLike actualFeedLikeBefore = feedLikeRepository.findById(FeedLikeIds.builder()
+                                                                               .userId(userId_2)
+                                                                               .feedId(feedId_2)
+                                                                               .build()
+                                                                    ).orElse(null); //insert 전 존재하지 않는 레코드 읽기 (expected null)
 
         feedLikeRepository.save(notExistedData);
-        FeedLike actualFeedLikeAfter = feedLikeRepository.findById(FeedLikeIds.builder().userId(userId_2).feedId(feedId_2).build()).orElse(null); //insert후 존재하는 레코드 읽기
-        List<FeedLike> actualFeedLikeListAfter = feedLikeRepository.findAll(); //insert후 튜플 수
+
+        List<FeedLike> actualFeedLikeListAfter = feedLikeRepository.findAll(); //insert 후 튜플 수 (expectedRows : 2)
+        FeedLike actualFeedLikeAfter = feedLikeRepository.findById(FeedLikeIds.builder()
+                                                                              .userId(userId_2)
+                                                                              .feedId(feedId_2)
+                                                                              .build()
+                                                                   ).orElse(null); //insert 후 존재하는 레코드 읽기 (expected not null)
 
         //then
         assertAll(

@@ -6,7 +6,6 @@ import lombok.*;
 import java.io.Serializable;
 
 @Getter
-@Setter
 @Embeddable
 @EqualsAndHashCode
 @Builder
