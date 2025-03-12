@@ -1,4 +1,4 @@
-package com.green.greengram.feed.like.model;
+package com.green.greengram.feed.like;
 
 import com.green.greengram.entity.FeedLike;
 import com.green.greengram.entity.FeedLikeIds;
